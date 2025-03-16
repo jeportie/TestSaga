@@ -5,8 +5,8 @@
 --                                                    +:+ +:+         +:+     --
 --   By: jeportie <jeportie@student.42.fr>          +#+  +:+       +#+        --
 --                                                +#+#+#+#+#+   +#+           --
---   Created: 2025/03/16 17:53:58 by jeportie          #+#    #+#             --
---   Updated: 2025/03/16 17:54:02 by jeportie         ###   ########.fr       --
+--   Created: 2025/03/16 17:56:32 by jeportie          #+#    #+#             --
+--   Updated: 2025/03/16 17:56:49 by jeportie         ###   ########.fr       --
 --                                                                            --
 -- -------------------------------------------------------------------------- --
 
@@ -19,6 +19,7 @@ local explorer_buf, explorer_win = nil, nil
 
 -- Helper: fill the buffer with blank lines.
 local function set_explorer_empty_lines(buf, height, width)
+  buf = tonumber(buf) or buf  -- ensure buf is a number
   api.nvim_buf_set_option(buf, "modifiable", true)
   local lines = {}
   for i = 1, height do
@@ -28,7 +29,7 @@ local function set_explorer_empty_lines(buf, height, width)
   api.nvim_buf_set_option(buf, "modifiable", false)
 end
 
--- Our mock content for the explorer.
+-- Our mock content – these are the lines we'll render via virt_text.
 local mock_lines = {
   "  Test Explorer",          -- Title with a NerdFont devicon
   "────────────────────────────",
@@ -39,11 +40,10 @@ local mock_lines = {
   "     Test 2.1",
   "     Test 2.2",
 }
-
 local explorer_height = #mock_lines
 local explorer_width = 30
 
--- Layout function returns our virt text version of the mock content.
+-- Layout function returns our virt_text version of mock_lines.
 local function explorer_layout(buf)
   local virt_lines = {}
   for _, line in ipairs(mock_lines) do
@@ -73,7 +73,7 @@ local function create_explorer_window()
     },
   }
 
-  -- Initialize Volt state.
+  -- Initialize Volt state for our explorer buffer.
   volt.gen_data({
     { buf = explorer_buf, layout = layout, xpad = 0, ns = ns },
   })
@@ -94,10 +94,10 @@ local function create_explorer_window()
   api.nvim_win_set_option(explorer_win, "relativenumber", false)
   api.nvim_win_set_option(explorer_win, "cursorline", false)
 
-  -- Fill the buffer with blank lines so that only Volt's virt_text is visible.
+  -- Fill the buffer with blank lines so that only Volt's virt_text shows.
   set_explorer_empty_lines(explorer_buf, explorer_height, explorer_width)
 
-  -- Render the explorer UI via Volt.
+  -- Run Volt with a custom_empty_lines function that uses our helper.
   local volt_opts = {
     h = explorer_height,
     w = explorer_width,
@@ -133,4 +133,3 @@ function Explorer.toggle()
 end
 
 return Explorer
-
