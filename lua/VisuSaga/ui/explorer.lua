@@ -5,8 +5,8 @@
 --                                                    +:+ +:+         +:+     --
 --   By: jeportie <jeportie@student.42.fr>          +#+  +:+       +#+        --
 --                                                +#+#+#+#+#+   +#+           --
---   Created: 2025/03/16 17:50:41 by jeportie          #+#    #+#             --
---   Updated: 2025/03/16 17:50:44 by jeportie         ###   ########.fr       --
+--   Created: 2025/03/16 17:53:58 by jeportie          #+#    #+#             --
+--   Updated: 2025/03/16 17:54:02 by jeportie         ###   ########.fr       --
 --                                                                            --
 -- -------------------------------------------------------------------------- --
 
@@ -17,7 +17,18 @@ local Explorer = {}
 
 local explorer_buf, explorer_win = nil, nil
 
--- Our mock content – one line per entry.
+-- Helper: fill the buffer with blank lines.
+local function set_explorer_empty_lines(buf, height, width)
+  api.nvim_buf_set_option(buf, "modifiable", true)
+  local lines = {}
+  for i = 1, height do
+    table.insert(lines, string.rep(" ", width))
+  end
+  api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+  api.nvim_buf_set_option(buf, "modifiable", false)
+end
+
+-- Our mock content for the explorer.
 local mock_lines = {
   "  Test Explorer",          -- Title with a NerdFont devicon
   "────────────────────────────",
@@ -28,19 +39,11 @@ local mock_lines = {
   "     Test 2.1",
   "     Test 2.2",
 }
+
 local explorer_height = #mock_lines
 local explorer_width = 30
 
--- A helper to create blank lines for our buffer.
-local function set_explorer_empty_lines(buf, height, width)
-  local lines = {}
-  for i = 1, height do
-    table.insert(lines, string.rep(" ", width))
-  end
-  api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-end
-
--- Our layout function: instead of reading the raw buffer, we return our virt text.
+-- Layout function returns our virt text version of the mock content.
 local function explorer_layout(buf)
   local virt_lines = {}
   for _, line in ipairs(mock_lines) do
@@ -50,8 +53,8 @@ local function explorer_layout(buf)
 end
 
 local function create_explorer_window()
-  -- Create the explorer buffer.
   explorer_buf = api.nvim_create_buf(false, true)
+  -- Set buffer options.
   api.nvim_buf_set_option(explorer_buf, "buftype", "nofile")
   api.nvim_buf_set_option(explorer_buf, "bufhidden", "wipe")
   api.nvim_buf_set_option(explorer_buf, "modifiable", false)
@@ -60,22 +63,22 @@ local function create_explorer_window()
   -- Create a namespace for Volt.
   local ns = api.nvim_create_namespace("VisuSagaExplorer")
 
-  -- Define a minimal layout using our layout function.
+  -- Define a layout that uses our layout function.
   local layout = {
     {
       name = "explorer",
       lines = explorer_layout,
       row = 0,
-      col_start = 0,  -- no extra horizontal padding here
+      col_start = 0,
     },
   }
 
-  -- Initialize Volt's state for this buffer.
+  -- Initialize Volt state.
   volt.gen_data({
     { buf = explorer_buf, layout = layout, xpad = 0, ns = ns },
   })
 
-  -- Open the explorer window as a floating window positioned on the right.
+  -- Open a floating window positioned on the right side.
   local opts = {
     row = 0,
     col = vim.o.columns - explorer_width,
@@ -87,15 +90,14 @@ local function create_explorer_window()
     zindex = 100,
   }
   explorer_win = api.nvim_open_win(explorer_buf, true, opts)
-  -- Disable line numbers, relative numbers, etc.
   api.nvim_win_set_option(explorer_win, "number", false)
   api.nvim_win_set_option(explorer_win, "relativenumber", false)
   api.nvim_win_set_option(explorer_win, "cursorline", false)
 
-  -- Fill the buffer with blank lines so that only Volt's virt_text shows.
+  -- Fill the buffer with blank lines so that only Volt's virt_text is visible.
   set_explorer_empty_lines(explorer_buf, explorer_height, explorer_width)
 
-  -- Run Volt on our buffer.
+  -- Render the explorer UI via Volt.
   local volt_opts = {
     h = explorer_height,
     w = explorer_width,
