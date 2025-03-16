@@ -5,8 +5,8 @@
 --                                                    +:+ +:+         +:+     --
 --   By: jeportie <jeportie@student.42.fr>          +#+  +:+       +#+        --
 --                                                +#+#+#+#+#+   +#+           --
---   Created: 2025/03/16 16:16:31 by jeportie          #+#    #+#             --
---   Updated: 2025/03/16 16:16:42 by jeportie         ###   ########.fr       --
+--   Created: 2025/03/16 17:50:41 by jeportie          #+#    #+#             --
+--   Updated: 2025/03/16 17:50:44 by jeportie         ###   ########.fr       --
 --                                                                            --
 -- -------------------------------------------------------------------------- --
 
@@ -15,102 +15,120 @@ local volt = require("volt")
 
 local Explorer = {}
 
-local explorer_buf = nil
-local explorer_win = nil
+local explorer_buf, explorer_win = nil, nil
 
--- Helper: convert plain text lines to virt text cells as expected by Volt.
-local function convert_lines_to_virt(lines)
-	local virt_lines = {}
-	for _, line in ipairs(lines) do
-		table.insert(virt_lines, { { line, "Normal" } })
-	end
-	return virt_lines
+-- Our mock content – one line per entry.
+local mock_lines = {
+  "  Test Explorer",          -- Title with a NerdFont devicon
+  "────────────────────────────",
+  "  Test Suite 1",
+  "     Test 1.1",
+  "     Test 1.2",
+  "  Test Suite 2",
+  "     Test 2.1",
+  "     Test 2.2",
+}
+local explorer_height = #mock_lines
+local explorer_width = 30
+
+-- A helper to create blank lines for our buffer.
+local function set_explorer_empty_lines(buf, height, width)
+  local lines = {}
+  for i = 1, height do
+    table.insert(lines, string.rep(" ", width))
+  end
+  api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+end
+
+-- Our layout function: instead of reading the raw buffer, we return our virt text.
+local function explorer_layout(buf)
+  local virt_lines = {}
+  for _, line in ipairs(mock_lines) do
+    table.insert(virt_lines, { { line, "Normal" } })
+  end
+  return virt_lines
 end
 
 local function create_explorer_window()
-	explorer_buf = api.nvim_create_buf(false, true)
+  -- Create the explorer buffer.
+  explorer_buf = api.nvim_create_buf(false, true)
+  api.nvim_buf_set_option(explorer_buf, "buftype", "nofile")
+  api.nvim_buf_set_option(explorer_buf, "bufhidden", "wipe")
+  api.nvim_buf_set_option(explorer_buf, "modifiable", false)
+  api.nvim_buf_set_option(explorer_buf, "filetype", "TestExplorer")
 
-	-- Set our mock content in the explorer buffer.
-	local lines = {
-		"  Test Explorer", -- Title with a NerdFont devicon.
-		"────────────────────────────",
-		"  Test Suite 1",
-		"     Test 1.1",
-		"     Test 1.2",
-		"  Test Suite 2",
-		"     Test 2.1",
-		"     Test 2.2",
-	}
-	api.nvim_buf_set_lines(explorer_buf, 0, -1, false, lines)
+  -- Create a namespace for Volt.
+  local ns = api.nvim_create_namespace("VisuSagaExplorer")
 
-	local ns = api.nvim_create_namespace("VisuSagaExplorer")
+  -- Define a minimal layout using our layout function.
+  local layout = {
+    {
+      name = "explorer",
+      lines = explorer_layout,
+      row = 0,
+      col_start = 0,  -- no extra horizontal padding here
+    },
+  }
 
-	-- Define a minimal layout that uses our buffer content.
-	local layout = {
-		{
-			name = "explorer",
-			lines = function(buf)
-				local plain_lines = api.nvim_buf_get_lines(buf, 0, -1, false)
-				return convert_lines_to_virt(plain_lines)
-			end,
-			row = 0,
-			col_start = 2,
-		},
-	}
+  -- Initialize Volt's state for this buffer.
+  volt.gen_data({
+    { buf = explorer_buf, layout = layout, xpad = 0, ns = ns },
+  })
 
-	-- Initialize Volt's state for our explorer buffer.
-	volt.gen_data({
-		{ buf = explorer_buf, xpad = 2, layout = layout, ns = ns },
-	})
+  -- Open the explorer window as a floating window positioned on the right.
+  local opts = {
+    row = 0,
+    col = vim.o.columns - explorer_width,
+    width = explorer_width,
+    height = explorer_height,
+    relative = "editor",
+    style = "minimal",
+    border = "single",
+    zindex = 100,
+  }
+  explorer_win = api.nvim_open_win(explorer_buf, true, opts)
+  -- Disable line numbers, relative numbers, etc.
+  api.nvim_win_set_option(explorer_win, "number", false)
+  api.nvim_win_set_option(explorer_win, "relativenumber", false)
+  api.nvim_win_set_option(explorer_win, "cursorline", false)
 
-	-- Open a right-side vertical split.
-	vim.cmd("rightbelow vsplit")
-	explorer_win = api.nvim_get_current_win()
+  -- Fill the buffer with blank lines so that only Volt's virt_text shows.
+  set_explorer_empty_lines(explorer_buf, explorer_height, explorer_width)
 
-	-- Set the explorer window width.
-	vim.cmd("vertical resize 30")
-
-	-- Set our explorer buffer into the current window.
-	api.nvim_win_set_buf(explorer_win, explorer_buf)
-
-	local explorer_opts = {
-		h = #lines, -- height equals the number of lines in our mock content
-		w = 30, -- width of the window
-		xpad = 2, -- horizontal padding
-		-- Prevent Volt from clearing our mock content.
-		custom_empty_lines = function() end,
-	}
-
-	-- Render the explorer UI via Volt.
-	volt.run(explorer_buf, explorer_opts)
+  -- Run Volt on our buffer.
+  local volt_opts = {
+    h = explorer_height,
+    w = explorer_width,
+    custom_empty_lines = function(buf, h, w)
+      set_explorer_empty_lines(buf, h, w)
+    end,
+  }
+  volt.run(explorer_buf, volt_opts)
 end
 
 function Explorer.open()
-	if explorer_win and api.nvim_win_is_valid(explorer_win) then
-		return
-	else
-		create_explorer_window()
-	end
+  if explorer_win and api.nvim_win_is_valid(explorer_win) then
+    return
+  else
+    create_explorer_window()
+  end
 end
 
 function Explorer.close()
-	if explorer_win and api.nvim_win_is_valid(explorer_win) then
-		-- If explorer_win is the only window, open a new vertical split to avoid closing the last window.
-		if #api.nvim_list_wins() == 1 then
-			vim.cmd("rightbelow vsplit")
-		end
-		api.nvim_win_close(explorer_win, true)
-		explorer_win = nil
-		explorer_buf = nil
-	end
+  if explorer_win and api.nvim_win_is_valid(explorer_win) then
+    api.nvim_win_close(explorer_win, true)
+    explorer_win = nil
+    explorer_buf = nil
+  end
 end
 
 function Explorer.toggle()
-	if explorer_win and api.nvim_win_is_valid(explorer_win) then
-		Explorer.close()
-	else
-		Explorer.open()
-	end
+  if explorer_win and api.nvim_win_is_valid(explorer_win) then
+    Explorer.close()
+  else
+    Explorer.open()
+  end
 end
 
 return Explorer
+
