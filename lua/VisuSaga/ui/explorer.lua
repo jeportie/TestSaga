@@ -5,8 +5,8 @@
 --                                                    +:+ +:+         +:+     --
 --   By: jeportie <jeportie@student.42.fr>          +#+  +:+       +#+        --
 --                                                +#+#+#+#+#+   +#+           --
---   Created: 2025/03/16 16:11:58 by jeportie          #+#    #+#             --
---   Updated: 2025/03/16 16:12:23 by jeportie         ###   ########.fr       --
+--   Created: 2025/03/16 16:16:31 by jeportie          #+#    #+#             --
+--   Updated: 2025/03/16 16:16:42 by jeportie         ###   ########.fr       --
 --                                                                            --
 -- -------------------------------------------------------------------------- --
 
@@ -30,6 +30,7 @@ end
 local function create_explorer_window()
 	explorer_buf = api.nvim_create_buf(false, true)
 
+	-- Set our mock content in the explorer buffer.
 	local lines = {
 		"  Test Explorer", -- Title with a NerdFont devicon.
 		"────────────────────────────",
@@ -44,7 +45,7 @@ local function create_explorer_window()
 
 	local ns = api.nvim_create_namespace("VisuSagaExplorer")
 
-	-- Define a minimal layout that converts buffer lines to virt text.
+	-- Define a minimal layout that uses our buffer content.
 	local layout = {
 		{
 			name = "explorer",
@@ -57,7 +58,7 @@ local function create_explorer_window()
 		},
 	}
 
-	-- Initialize Volt's state for this buffer.
+	-- Initialize Volt's state for our explorer buffer.
 	volt.gen_data({
 		{ buf = explorer_buf, xpad = 2, layout = layout, ns = ns },
 	})
@@ -69,13 +70,15 @@ local function create_explorer_window()
 	-- Set the explorer window width.
 	vim.cmd("vertical resize 30")
 
-	-- Set our explorer buffer in this window.
+	-- Set our explorer buffer into the current window.
 	api.nvim_win_set_buf(explorer_win, explorer_buf)
 
 	local explorer_opts = {
-		h = #lines,
-		w = 30,
-		xpad = 2,
+		h = #lines, -- height equals the number of lines in our mock content
+		w = 30, -- width of the window
+		xpad = 2, -- horizontal padding
+		-- Prevent Volt from clearing our mock content.
+		custom_empty_lines = function() end,
 	}
 
 	-- Render the explorer UI via Volt.
@@ -92,7 +95,7 @@ end
 
 function Explorer.close()
 	if explorer_win and api.nvim_win_is_valid(explorer_win) then
-		-- If explorer_win is the only window, open a new vertical split so it's not the last.
+		-- If explorer_win is the only window, open a new vertical split to avoid closing the last window.
 		if #api.nvim_list_wins() == 1 then
 			vim.cmd("rightbelow vsplit")
 		end
