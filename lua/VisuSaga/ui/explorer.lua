@@ -5,8 +5,8 @@
 --                                                    +:+ +:+         +:+     --
 --   By: jeportie <jeportie@student.42.fr>          +#+  +:+       +#+        --
 --                                                +#+#+#+#+#+   +#+           --
---   Created: 2025/03/16 17:56:32 by jeportie          #+#    #+#             --
---   Updated: 2025/03/16 17:56:49 by jeportie         ###   ########.fr       --
+--   Created: 2025/03/16 18:09:17 by jeportie          #+#    #+#             --
+--   Updated: 2025/03/16 18:09:21 by jeportie         ###   ########.fr       --
 --                                                                            --
 -- -------------------------------------------------------------------------- --
 
@@ -16,22 +16,11 @@ local volt = require("volt")
 local Explorer = {}
 
 local explorer_buf, explorer_win = nil, nil
+local explorer_ns = api.nvim_create_namespace("TestExplorer")
 
--- Helper: fill the buffer with blank lines.
-local function set_explorer_empty_lines(buf, height, width)
-  buf = tonumber(buf) or buf  -- ensure buf is a number
-  api.nvim_buf_set_option(buf, "modifiable", true)
-  local lines = {}
-  for i = 1, height do
-    table.insert(lines, string.rep(" ", width))
-  end
-  api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-  api.nvim_buf_set_option(buf, "modifiable", false)
-end
-
--- Our mock content – these are the lines we'll render via virt_text.
+-- Our mock data for the explorer (feel free to update icons or text)
 local mock_lines = {
-  "  Test Explorer",          -- Title with a NerdFont devicon
+  "  Test Explorer",         -- Title with a NerdFont devicon
   "────────────────────────────",
   "  Test Suite 1",
   "     Test 1.1",
@@ -40,11 +29,12 @@ local mock_lines = {
   "     Test 2.1",
   "     Test 2.2",
 }
+
 local explorer_height = #mock_lines
 local explorer_width = 30
 
--- Layout function returns our virt_text version of mock_lines.
-local function explorer_layout(buf)
+-- Layout function: converts each mock line into a virt_text line
+local function explorer_layout()
   local virt_lines = {}
   for _, line in ipairs(mock_lines) do
     table.insert(virt_lines, { { line, "Normal" } })
@@ -53,17 +43,13 @@ local function explorer_layout(buf)
 end
 
 local function create_explorer_window()
+  -- Create a scratch buffer for the explorer.
   explorer_buf = api.nvim_create_buf(false, true)
-  -- Set buffer options.
   api.nvim_buf_set_option(explorer_buf, "buftype", "nofile")
   api.nvim_buf_set_option(explorer_buf, "bufhidden", "wipe")
-  api.nvim_buf_set_option(explorer_buf, "modifiable", false)
   api.nvim_buf_set_option(explorer_buf, "filetype", "TestExplorer")
 
-  -- Create a namespace for Volt.
-  local ns = api.nvim_create_namespace("VisuSagaExplorer")
-
-  -- Define a layout that uses our layout function.
+  -- Define a simple layout using our explorer_layout function.
   local layout = {
     {
       name = "explorer",
@@ -73,12 +59,10 @@ local function create_explorer_window()
     },
   }
 
-  -- Initialize Volt state for our explorer buffer.
-  volt.gen_data({
-    { buf = explorer_buf, layout = layout, xpad = 0, ns = ns },
-  })
+  -- Register the layout with Volt (like Typr does).
+  volt.gen_data({ { buf = explorer_buf, layout = layout, xpad = 0, ns = explorer_ns } })
 
-  -- Open a floating window positioned on the right side.
+  -- Create a floating window on the right side.
   local opts = {
     row = 0,
     col = vim.o.columns - explorer_width,
@@ -94,18 +78,8 @@ local function create_explorer_window()
   api.nvim_win_set_option(explorer_win, "relativenumber", false)
   api.nvim_win_set_option(explorer_win, "cursorline", false)
 
-  -- Fill the buffer with blank lines so that only Volt's virt_text shows.
-  set_explorer_empty_lines(explorer_buf, explorer_height, explorer_width)
-
-  -- Run Volt with a custom_empty_lines function that uses our helper.
-  local volt_opts = {
-    h = explorer_height,
-    w = explorer_width,
-    custom_empty_lines = function(buf, h, w)
-      set_explorer_empty_lines(buf, h, w)
-    end,
-  }
-  volt.run(explorer_buf, volt_opts)
+  -- Run Volt to render our layout.
+  volt.run(explorer_buf, { h = explorer_height, w = explorer_width })
 end
 
 function Explorer.open()
@@ -133,3 +107,4 @@ function Explorer.toggle()
 end
 
 return Explorer
+
