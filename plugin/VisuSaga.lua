@@ -13,4 +13,3 @@
 vim.api.nvim_create_user_command("ToggleVisuSagaExplorer", function()
   require("VisuSaga.ui.explorer").toggle()
 end, {})
-
